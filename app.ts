@@ -37,7 +37,7 @@ if (process.env.MAX_DATE != null && process.env.MAX_DATE.length > 0)
 let alreadySavedCache = false;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3';
 
-async function resolveShorURL(url: string): Promise<string> {
+async function resolveShortURL(url: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
         try{
             if (url.startsWith('https://')) {
@@ -92,7 +92,7 @@ async function cleanTweetText(
         const newUrls: string[] = [];
         for (let index = 0; index < urls.length; index++) {
             // use tweet.entities.urls mapping instead, so we can make sure the result is the same as the origin. 
-            const newUrl = urlMappings.find(({url}) => urls[index] == url )?.expanded_url ?? await resolveShorURL(urls[index]);
+            const newUrl = urlMappings.find(({url}) => urls[index] == url )?.expanded_url ?? await resolveShortURL(urls[index]);
 
             if (   checkPastHandles(newUrl) 
                 && newUrl.indexOf("/photo/") == -1 
