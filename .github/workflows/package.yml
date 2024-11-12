@@ -1,0 +1,125 @@
+name: Build and Release Executables
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            target: node20-win-x64
+            ext: .exe
+            sharp_platform: win32-x64
+          - os: ubuntu-latest
+            platform: linux
+            target: node20-linux-x64
+            ext: ''
+            sharp_platform: linux-x64
+          - os: macos-latest
+            platform: macos
+            target: node20-mac-x64,node20-mac-arm64
+            ext: ''
+            sharp_platform: darwin-x64
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Windows: Install Visual Studio Build Tools
+      - name: Install Windows Build Tools
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm install --global windows-build-tools
+          npm config set msvs_version 2019
+      
+      # Linux: Install build essentials
+      - name: Install Linux Build Tools
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3
+      
+      # macOS: Install build tools
+      - name: Install macOS Build Tools
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install pkg-config
+          brew install cairo pango libpng jpeg giflib librsvg
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.0'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm install -g node-gyp
+          npm ci
+      
+      - name: Install @yao-pkg/pkg
+        run: npm install -g @yao-pkg/pkg
+      
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Create output directory
+        run: mkdir -p dist/sharp
+
+      # Remove and reinstall Sharp for specific platform
+      - name: Install platform-specific Sharp
+        shell: bash
+        run: |
+          npm remove sharp
+          npm install --platform=${{ matrix.sharp_platform }} --arch=x64 sharp
+
+      # Copy Sharp's native files
+      - name: Copy Sharp files
+        shell: bash
+        run: |
+          mkdir -p dist/package/sharp
+          cp -r node_modules/sharp dist/package/sharp/
+      
+      - name: Build executable
+        run: pkg . --targets ${{ matrix.target }} --output dist/package/twittertobluesky${{ matrix.ext }}
+      
+      # Create archive
+      - name: Create archive
+        shell: bash
+        run: |
+          cd dist
+          tar -czf twittertobluesky-${{ matrix.platform }}.tar.gz package/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: executable-${{ matrix.platform }}
+          path: dist/twittertobluesky-${{ matrix.platform }}.tar.gz
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: dist/twittertobluesky-*.tar.gz

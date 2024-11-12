@@ -18,4 +18,10 @@ libs/bskyAPI.js
 
 # mapping files
 tweets_mapping.json
-**/*.js.map
+
+# build output
+dist/
+build/
+sea-config.json
+sea-prep.blob
+twittertobluesky.*
